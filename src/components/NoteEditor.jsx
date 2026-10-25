@@ -14,6 +14,8 @@ export default function NoteEditor({ initialTitle, initialDoc, section, onSave, 
   const [sourceDraft, setSourceDraft] = useState('');
   const [focusedCodeIndex, setFocusedCodeIndex] = useState(null);
   const [focusedTipIndex, setFocusedTipIndex] = useState(null);
+  const [saveError, setSaveError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   const updateSection = (index, key, value) => {
     setSections((current) => current.map((item, i) => {
@@ -38,11 +40,12 @@ export default function NoteEditor({ initialTitle, initialDoc, section, onSave, 
     setSources((current) => [...current, url]);
     setSourceDraft('');
   };
-  const save = (event) => {
+  const save = async (event) => {
     event.preventDefault();
     const cleanTitle = title.trim();
     if (!cleanTitle) return;
-    onSave(cleanTitle, {
+    setIsSaving(true); setSaveError('');
+    try { await onSave(cleanTitle, {
       subtitle: subtitle.trim(), lead: lead.trim(), sources,
       sections: sections.filter((part) => part.heading.trim() || part.text.trim() || part.code.trim() || part.tip.trim()).map((part) => ({
         heading: part.heading.trim() || 'Notes',
@@ -50,7 +53,7 @@ export default function NoteEditor({ initialTitle, initialDoc, section, onSave, 
         ...(part.code.trim() ? { code: part.code, language: part.language } : {}),
         ...(part.tip.trim() ? { callout: part.tip } : {})
       }))
-    });
+    }); } catch (error) { setSaveError(error.message || 'Unable to save this note.'); } finally { setIsSaving(false); }
   };
 
   return <section className="inline-editor" aria-labelledby="editor-title">
@@ -71,8 +74,9 @@ export default function NoteEditor({ initialTitle, initialDoc, section, onSave, 
         <div className="editor-block-heading source-heading"><span>SOURCES</span><Link2 size={14} /></div>
         <div className="source-add-row"><input value={sourceDraft} onChange={(event) => setSourceDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addSource(); } }} placeholder="Paste a URL, e.g. https://developer.mozilla.org/…" /><button type="button" onClick={addSource}><Plus size={14} /> Add</button></div>
         {sources.length > 0 && <ul className="editor-source-list">{sources.map((source, index) => <li key={`${source}-${index}`}><a href={source} target="_blank" rel="noreferrer">{source}</a><button type="button" onClick={() => setSources((current) => current.filter((_, i) => i !== index))} aria-label="Remove source"><X size={13} /></button></li>)}</ul>}
-        <p className="editor-storage-note">Changes last for this session only. Notes aren’t saved after you refresh.</p>
-        <footer className="editor-actions"><button type="button" className="editor-cancel" onClick={onCancel}>Cancel</button><button type="submit" className="editor-save">Save note</button></footer>
+        <p className="editor-storage-note">Changes are saved to your documentation database.</p>
+        {saveError && <p className="editor-save-error" role="alert">{saveError}</p>}
+        <footer className="editor-actions"><button type="button" className="editor-cancel" onClick={onCancel} disabled={isSaving}>Cancel</button><button type="submit" className="editor-save" disabled={isSaving}>{isSaving ? 'Saving…' : 'Save note'}</button></footer>
       </form>
   </section>;
 }

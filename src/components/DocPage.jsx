@@ -5,7 +5,7 @@ export default function DocPage({ section, topic, doc, onSelect }) {
   if (!doc) return <article className="doc-page empty-doc">
     <h1>{topic}</h1>
     <p className="empty-description">This page is ready for your notes.</p>
-    <div className="empty-tip"><Lightbulb size={16} /><span>Add your own explanations, examples, and reminders to <code>src/data/docs.js</code> whenever you’re ready.</span></div>
+    <div className="empty-tip"><Lightbulb size={16} /><span>This page is ready for your explanations, examples, and reminders.</span></div>
     <h2 className="next-heading">Keep exploring</h2>
     <p className="muted-copy">Choose another topic from the sidebar to continue.</p>
   </article>;

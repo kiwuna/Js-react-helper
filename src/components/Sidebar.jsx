@@ -2,7 +2,7 @@ import { Search, X, Trash2, Edit3 } from 'lucide-react';
 import SearchResults from './SearchResults.jsx';
 import { useState, useRef, useEffect } from 'react';
 
-export default function Sidebar({ section, sectionId, topic, onSelect, query, setQuery, results, mobileOpen, closeMobile, onDeleteTopic, onRenameTopic }) {
+export default function Sidebar({ section, sectionId, topic, onSelect, query, setQuery, results, mobileOpen, closeMobile, onDeleteTopic, onRenameTopic, canEdit }) {
   const [contextMenu, setContextMenu] = useState(null);
   const contextMenuRef = useRef(null);
 
@@ -40,7 +40,7 @@ export default function Sidebar({ section, sectionId, topic, onSelect, query, se
     <aside className={`sidebar ${mobileOpen ? 'sidebar-open' : ''}`}>
       <div className="sidebar-top"><div className="sidebar-section-label"><span>{section.name}</span><span className="topic-count">{section.topics.length} TOPICS</span></div><button className="mobile-close" onClick={closeMobile} aria-label="Close menu"><X size={17} /></button></div>
       <nav className="topic-list" aria-label={`${section.name} topics`}>
-        {section.topics.map((item, index) => <button className={`topic-button ${topic === item ? 'active' : ''}`} key={item} onClick={() => onSelect(item)} onContextMenu={(event) => handleContextMenu(event, item)} aria-current={topic === item ? 'page' : undefined}>
+        {section.topics.map((item, index) => <button className={`topic-button ${topic === item ? 'active' : ''}`} key={item} onClick={() => onSelect(item)} onContextMenu={canEdit ? (event) => handleContextMenu(event, item) : undefined} aria-current={topic === item ? 'page' : undefined}>
           <span className="topic-number">{String(index + 1).padStart(2, '0')}</span><span className="topic-name">{item}</span>{topic === item && <span className="active-dot" />}
         </button>)}
       </nav>
