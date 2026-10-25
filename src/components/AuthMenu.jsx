@@ -18,7 +18,7 @@ export default function AuthMenu({ user, onUserChange }) {
       : await supabase.auth.signUp({ email, password });
     setBusy(false);
     if (result.error) { setMessage(result.error.message); return; }
-    if (mode === 'sign-up' && !result.data.session) setMessage('Check your email to confirm your account, then sign in.');
+    if (mode === 'sign-up' && !result.data.session) setMessage('Email confirmation is enabled in Supabase. Disable Confirm email to sign in immediately.');
     else { onUserChange(result.data.user ?? result.data.session?.user ?? null); setOpen(false); }
   };
 

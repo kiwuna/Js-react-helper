@@ -33,9 +33,9 @@ The schema seeds the existing JavaScript and React topic lists and their introdu
 
 ## 5. Enable editor sign-in
 
-1. In Supabase, open **Authentication → Providers → Email** and ensure Email is enabled.
+1. In Supabase, open **Authentication → Providers → Email**, enable Email, and turn off **Confirm email**. New editor accounts can then sign in immediately without email confirmation.
 2. In **Authentication → URL Configuration**, add your local Vite URL (for example `http://localhost:5173`) and your deployed Vercel URL to Redirect URLs.
-3. Use the top-right profile button in the website to create an account or sign in. Confirm the email first if email confirmation is enabled in Supabase.
+3. Use the top-right profile button in the website to create an account or sign in.
 
 ## 6. Run locally
 
