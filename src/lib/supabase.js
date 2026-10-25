@@ -8,5 +8,7 @@ export const isSupabaseConfigured = Boolean(supabaseUrl && supabasePublishableKe
 // Vite only exposes variables beginning with VITE_. This must be the project's
 // publishable/anon key, never a service-role key.
 export const supabase = isSupabaseConfigured
-  ? createClient(supabaseUrl, supabasePublishableKey)
+  ? createClient(supabaseUrl, supabasePublishableKey, {
+    auth: { persistSession: false, autoRefreshToken: true }
+  })
   : null;

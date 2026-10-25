@@ -29,13 +29,22 @@ VITE_SUPABASE_PUBLISHABLE_KEY=your_publishable_or_anon_key
 2. Paste the complete contents of `supabase/schema.corrected.sql` and run it.
 3. Verify under **Table Editor** that `documentation_sections`, `topics`, and `topic_content` exist.
 
-The schema seeds the existing JavaScript and React topic lists and their introduction pages. RLS stays enabled on every table. Visitors can read the documentation, while email/password-authenticated users can create, edit, rename, and delete notes.
+The schema seeds the existing JavaScript and React topic lists and their introduction pages. RLS stays enabled on every table. Visitors can read the documentation, while only allowlisted editors can create, edit, rename, and delete notes.
 
 ## 5. Enable editor sign-in
 
 1. In Supabase, open **Authentication → Providers → Email** and ensure Email is enabled. Keep **Confirm email** enabled for secure account verification.
 2. In **Authentication → URL Configuration**, add your local Vite URL (for example `http://localhost:5173`) and your deployed Vercel URL to Redirect URLs.
 3. Use the top-right profile button in the website to create an account or sign in. New accounts must confirm their email before first sign-in.
+4. In SQL Editor, allow an account to edit (replace the email):
+
+```sql
+insert into public.documentation_editors (user_id)
+select id from auth.users where email = 'editor@example.com'
+on conflict (user_id) do nothing;
+```
+
+Editors must enter their own account password to unlock changes. The unlock lasts 10 minutes and is held only in memory; it is not stored in browser storage.
 
 ## 6. Run locally
 

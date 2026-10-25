@@ -36,6 +36,12 @@ export async function fetchDocumentation() {
   }));
 }
 
+export async function fetchEditorPermission() {
+  const { data, error } = await requireClient().rpc('current_user_is_editor');
+  throwIfError(error);
+  return Boolean(data);
+}
+
 export async function createTopic(sectionId, title, doc, position) {
   const client = requireClient();
   const { data: topic, error: topicError } = await client

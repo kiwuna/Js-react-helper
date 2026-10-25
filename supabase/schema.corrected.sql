@@ -32,6 +32,28 @@ create table if not exists public.topic_content (
   updated_at timestamptz not null default now()
 );
 
+-- Only users listed here may change documentation. Add editors from the SQL
+-- Editor after they have created and confirmed an account.
+create table if not exists public.documentation_editors (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+create or replace function public.current_user_is_editor()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.documentation_editors where user_id = auth.uid()
+  );
+$$;
+
+revoke all on public.documentation_editors from anon, authenticated;
+grant execute on function public.current_user_is_editor() to authenticated;
+
 create or replace function public.set_updated_at()
 returns trigger language plpgsql as $$ begin new.updated_at = now(); return new; end; $$;
 drop trigger if exists topics_set_updated_at on public.topics;
@@ -78,6 +100,7 @@ on conflict (topic_id) do nothing;
 alter table public.documentation_sections enable row level security;
 alter table public.topics enable row level security;
 alter table public.topic_content enable row level security;
+alter table public.documentation_editors enable row level security;
 
 -- Remove only the policies created by the prior script, including its unsafe
 -- anonymous write policies, then install public read-only policies.
@@ -91,6 +114,8 @@ drop policy if exists "Public read topics" on public.topics;
 drop policy if exists "Public read topic content" on public.topic_content;
 drop policy if exists "Signed-in users can manage topics" on public.topics;
 drop policy if exists "Signed-in users can manage topic content" on public.topic_content;
+drop policy if exists "Editors can manage topics" on public.topics;
+drop policy if exists "Editors can manage topic content" on public.topic_content;
 
 create policy "Public read documentation sections"
 on public.documentation_sections for select to anon, authenticated using (true);
@@ -99,10 +124,18 @@ on public.topics for select to anon, authenticated using (true);
 create policy "Public read topic content"
 on public.topic_content for select to anon, authenticated using (true);
 
-create policy "Signed-in users can manage topics"
+create policy "Editors can manage topics"
 on public.topics for all to authenticated
-using (true) with check (true);
+using (public.current_user_is_editor())
+with check (public.current_user_is_editor());
 
-create policy "Signed-in users can manage topic content"
+create policy "Editors can manage topic content"
 on public.topic_content for all to authenticated
-using (true) with check (true);
+using (public.current_user_is_editor())
+with check (public.current_user_is_editor());
+
+-- After the editor signs up and confirms their email, run this once, replacing
+-- the email with that editor's real email address:
+-- insert into public.documentation_editors (user_id)
+-- select id from auth.users where email = 'editor@example.com'
+-- on conflict (user_id) do nothing;
