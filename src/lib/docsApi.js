@@ -44,40 +44,29 @@ export async function fetchEditorPermission() {
 
 export async function createTopic(sectionId, title, doc, position) {
   const client = requireClient();
-  const { data: topic, error: topicError } = await client
-    .from('topics')
-    .insert({ section_id: sectionId, title, position })
-    .select('id, title, position')
-    .single();
-  throwIfError(topicError);
-  try {
-    await saveContent(topic.id, doc);
-  } catch (error) {
-    // Avoid leaving an empty topic behind if its content could not be saved.
-    await client.from('topics').delete().eq('id', topic.id);
-    throw error;
-  }
+  const topic = await saveTopic(client, null, sectionId, title, position, doc);
   return { ...topic, doc };
 }
 
 export async function updateTopic(topicId, title, doc) {
   const client = requireClient();
-  const { error } = await client.from('topics').update({ title }).eq('id', topicId);
-  throwIfError(error);
-  await saveContent(topicId, doc);
+  await saveTopic(client, topicId, null, title, null, doc);
 }
 
-async function saveContent(topicId, doc) {
-  const client = requireClient();
-  const { error } = await client.from('topic_content').upsert({
-    topic_id: topicId,
-    subtitle: doc.subtitle,
-    lead: doc.lead,
-    content_blocks: doc.sections,
-    sources: doc.sources,
-    related_topics: doc.related ?? []
-  }, { onConflict: 'topic_id' });
+async function saveTopic(client, topicId, sectionId, title, position, doc) {
+  const { data, error } = await client.rpc('save_documentation_topic', {
+    p_topic_id: topicId,
+    p_section_id: sectionId,
+    p_title: title,
+    p_position: position,
+    p_subtitle: doc.subtitle,
+    p_lead: doc.lead,
+    p_content_blocks: doc.sections,
+    p_sources: doc.sources,
+    p_related_topics: doc.related ?? []
+  }).single();
   throwIfError(error);
+  return data;
 }
 
 export async function deleteTopic(topicId) {

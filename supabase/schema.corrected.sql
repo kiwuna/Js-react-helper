@@ -39,6 +39,13 @@ create table if not exists public.documentation_editors (
   created_at timestamptz not null default now()
 );
 
+-- This one-row table permanently marks the starter-data migration as complete.
+-- It prevents future schema runs from recreating or changing user documentation.
+create table if not exists public.documentation_seed_state (
+  id boolean primary key default true check (id),
+  completed_at timestamptz not null default now()
+);
+
 create or replace function public.current_user_is_editor()
 returns boolean
 language sql
@@ -54,6 +61,58 @@ $$;
 revoke all on public.documentation_editors from anon, authenticated;
 grant execute on function public.current_user_is_editor() to authenticated;
 
+-- Atomically creates or updates a topic and its content. If any validation or
+-- write fails, PostgreSQL rolls back the entire operation.
+create or replace function public.save_documentation_topic(
+  p_topic_id uuid,
+  p_section_id text,
+  p_title text,
+  p_position integer,
+  p_subtitle text,
+  p_lead text,
+  p_content_blocks jsonb,
+  p_sources jsonb,
+  p_related_topics jsonb
+)
+returns table (id uuid, title text, position integer)
+language plpgsql
+set search_path = public
+as $$
+declare
+  saved_topic public.topics%rowtype;
+begin
+  if p_topic_id is null then
+    insert into public.topics (section_id, title, position)
+    values (p_section_id, p_title, p_position)
+    returning * into saved_topic;
+  else
+    update public.topics
+    set title = p_title
+    where id = p_topic_id
+    returning * into saved_topic;
+    if not found then
+      raise exception 'Topic not found';
+    end if;
+  end if;
+
+  insert into public.topic_content (
+    topic_id, subtitle, lead, content_blocks, sources, related_topics
+  ) values (
+    saved_topic.id, p_subtitle, p_lead, p_content_blocks, p_sources, p_related_topics
+  ) on conflict (topic_id) do update set
+    subtitle = excluded.subtitle,
+    lead = excluded.lead,
+    content_blocks = excluded.content_blocks,
+    sources = excluded.sources,
+    related_topics = excluded.related_topics;
+
+  return query select saved_topic.id, saved_topic.title, saved_topic.position;
+end;
+$$;
+
+grant execute on function public.save_documentation_topic(uuid, text, text, integer, text, text, jsonb, jsonb, jsonb) to authenticated;
+notify pgrst, 'reload schema';
+
 create or replace function public.set_updated_at()
 returns trigger language plpgsql as $$ begin new.updated_at = now(); return new; end; $$;
 drop trigger if exists topics_set_updated_at on public.topics;
@@ -64,6 +123,13 @@ create trigger topic_content_set_updated_at before update on public.topic_conten
 insert into public.documentation_sections (id, name, short_name, color, position) values
   ('javascript', 'JavaScript', 'JS', '#f3d52c', 1),
   ('react', 'React', 'R', '#48c8df', 2)
+on conflict (id) do nothing;
+
+-- A populated database may have been created by an earlier version of this
+-- script. Mark it initialized before evaluating the starter-data seed.
+insert into public.documentation_seed_state (id)
+select true
+where exists (select 1 from public.topics)
 on conflict (id) do nothing;
 
 -- JSON seed data avoids the invalid relation-style parsing caused by the prior
@@ -77,6 +143,7 @@ insert into public.topics (section_id, title, position)
 select seed.section_id, entries.title, entries.position::integer - 1
 from topic_seed as seed
 cross join lateral jsonb_array_elements_text(seed.topic_titles) with ordinality as entries(title, position)
+where not exists (select 1 from public.documentation_seed_state where id)
 on conflict (section_id, title) do nothing;
 
 insert into public.topic_content (topic_id, subtitle, lead, content_blocks, related_topics)
@@ -86,6 +153,7 @@ select id,
   $js$[{"heading":"What JavaScript does","paragraphs":["HTML gives a page its structure, and CSS describes its appearance. JavaScript adds behavior: responding to clicks, updating content, validating forms, and working with data."]},{"heading":"A first example","code":"const greeting = \"Hello, world!\";\nconsole.log(greeting);","language":"javascript","caption":"Open your browser console to see the message."},{"heading":"A few useful ideas","bullets":["Values can be stored in variables and combined with operators.","Functions package reusable steps.","The browser provides APIs for interacting with the page and the network."]}]$js$::jsonb,
   $$["Variables and Data Types","Functions","DOM Manipulation"]$$::jsonb
 from public.topics where section_id = 'javascript' and title = 'Introduction'
+  and not exists (select 1 from public.documentation_seed_state where id)
 on conflict (topic_id) do nothing;
 
 insert into public.topic_content (topic_id, subtitle, lead, content_blocks, related_topics)
@@ -95,12 +163,18 @@ select id,
   $react$[{"heading":"Think in components","paragraphs":["A component is a reusable piece of interface, such as a button, a navigation bar, or an entire page. Components can be composed together to build a complete application."]},{"heading":"A small component","code":"function Greeting() {\n  return <h1>Hello, React!</h1>;\n}","language":"jsx","caption":"A function component returns the UI it describes."},{"heading":"What to learn next","bullets":["JSX describes UI with familiar JavaScript expressions.","Props pass information into a component.","State lets a component remember information that changes over time."]}]$react$::jsonb,
   $$["Setting Up React with Vite","JSX","Components","Props","State"]$$::jsonb
 from public.topics where section_id = 'react' and title = 'Introduction'
+  and not exists (select 1 from public.documentation_seed_state where id)
 on conflict (topic_id) do nothing;
+
+insert into public.documentation_seed_state (id)
+values (true)
+on conflict (id) do nothing;
 
 alter table public.documentation_sections enable row level security;
 alter table public.topics enable row level security;
 alter table public.topic_content enable row level security;
 alter table public.documentation_editors enable row level security;
+alter table public.documentation_seed_state enable row level security;
 
 -- Remove only the policies created by the prior script, including its unsafe
 -- anonymous write policies, then install public read-only policies.

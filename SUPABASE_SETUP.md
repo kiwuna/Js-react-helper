@@ -46,6 +46,8 @@ on conflict (user_id) do nothing;
 
 Editors must enter their own account password to unlock changes. The unlock lasts 10 minutes and is held only in memory; it is not stored in browser storage.
 
+Each create or edit operation is executed as one PostgreSQL transaction: a topic and all of its content either save together or are rolled back together. A completed save is stored in Supabase, so it remains after refresh. The schema records a one-time initialization marker on its first successful run; later runs never seed, restore, overwrite, or delete documentation data.
+
 ## 6. Run locally
 
 ```bash
